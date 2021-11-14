@@ -165,7 +165,7 @@ $ kubectl proxy
 In browser connect to http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
 
 Output:
-![screenshot](/assets/images/task1_screen1.png)
+![screenshot](task1_screen1.png)
 
 # Task 1.2
 # Kubernetes resources introduction
