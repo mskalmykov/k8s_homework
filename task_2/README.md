@@ -258,4 +258,118 @@ web-5584c6c5c6-4wv4v
 * In Minikube in namespace kube-system, there are many different pods running. Your task is to figure out who creates them, and who makes sure they are running (restores them after deletion).
 >_My guess is that it is *kubelet* process who creates and maintains other control panel pods in kube-system namespace._
 * Implement Canary deployment of an application via Ingress. Traffic to canary deployment should be redirected if you add "canary:always" in the header, otherwise it should go to regular deployment.
-Set to redirect a percentage of traffic to canary deployment.
+  - Create production environment:
+```bash
+$ kubectl create namespace prod
+$ kubectl -n prod apply -f education/task_2/nginx-configmap.yaml
+$ kubectl -n prod edit cm nginx-configmap
+Change return string to:
+    return 200 'Prod: $hostname\n';
+$ kubectl -n prod apply -f education/task_2/deployment.yaml
+$ kubectl -n prod apply -f education/task_2/service_template.yaml
+
+$ kubectl -n prod get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+web-5584c6c5c6-2xfvj   1/1     Running   0          28m
+web-5584c6c5c6-sdncv   1/1     Running   0          28m
+web-5584c6c5c6-t7dbk   1/1     Running   0          28m
+
+$ kubectl -n prod get svc
+NAME   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+web    ClusterIP   10.104.245.187   <none>        80/TCP    31m
+```
+  - Create canary environment:
+```bash
+$ kubectl create ns canary
+$ kubectl -n canary apply -f education/task_2/nginx-configmap.yaml
+$ kubectl -n canary edit cm nginx-configmap
+Change return string to:
+    return 200 'Canary: $hostname\n';
+$ kubectl -n canary apply -f education/task_2/deployment.yaml
+$ kubectl -n canary apply -f education/task_2/service_template.yaml
+
+$ kubectl -n canary get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+web-5584c6c5c6-7926r   1/1     Running   0          32m
+web-5584c6c5c6-fsq9m   1/1     Running   0          32m
+web-5584c6c5c6-pkmff   1/1     Running   0          32m
+
+$ kubectl -n canary get svc
+NAME   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+web    ClusterIP   10.100.224.204   <none>        80/TCP    31m
+```
+  - Create ingress for canary (with custom annotations):
+```bash
+$ kubectl -n canary apply -f education/task_2/ingress.yaml
+$ kubectl -n canary edit ingress ingress-web
+Add to the annotations dictionary:
+  nginx.ingress.kubernetes.io/canary: "true"
+  nginx.ingress.kubernetes.io/canary-by-header: canary
+```
+  - Create ingress for prod (without annotations):
+```bash
+$ kubectl -n prod apply -f education/task_2/ingress.yaml
+```
+  - Check prod:
+```bash
+$ minikube ip
+192.168.49.2
+
+$ for i in {1..10} ; do curl 192.168.49.2 ; done
+Prod: web-5584c6c5c6-2xfvj
+Prod: web-5584c6c5c6-sdncv
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+Prod: web-5584c6c5c6-sdncv
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+Prod: web-5584c6c5c6-sdncv
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+```
+  - Check canary:
+```bash
+$ for i in {1..10} ; do curl -H "canary:always" 192.168.49.2 ; done
+Canary: web-5584c6c5c6-7926r
+Canary: web-5584c6c5c6-fsq9m
+Canary: web-5584c6c5c6-pkmff
+Canary: web-5584c6c5c6-7926r
+Canary: web-5584c6c5c6-7926r
+Canary: web-5584c6c5c6-fsq9m
+Canary: web-5584c6c5c6-fsq9m
+Canary: web-5584c6c5c6-pkmff
+Canary: web-5584c6c5c6-7926r
+Canary: web-5584c6c5c6-pkmff
+```
+* Set to redirect a percentage of traffic to canary deployment.
+```bash
+$ kubectl -n canary edit ingress ingress-web
+Replace annotation key:
+    nginx.ingress.kubernetes.io/canary-by-header: canary
+with this one:
+    nginx.ingress.kubernetes.io/canary-weight: "20"
+```
+Check if it works:
+```bash
+$ for i in {1..20} ; do curl 192.168.49.2 ; done
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+Prod: web-5584c6c5c6-sdncv
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+Canary: web-5584c6c5c6-7926r
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-sdncv
+Prod: web-5584c6c5c6-2xfvj
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+Canary: web-5584c6c5c6-fsq9m
+Prod: web-5584c6c5c6-sdncv
+Canary: web-5584c6c5c6-7926r
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+Canary: web-5584c6c5c6-fsq9m
+Prod: web-5584c6c5c6-sdncv
+Prod: web-5584c6c5c6-t7dbk
+Prod: web-5584c6c5c6-2xfvj
+```
