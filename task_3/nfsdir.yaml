@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-nfsdir
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx
+        imagePullPolicy: Never
+        name: nginx
+        volumeMounts:
+        - name: nfsdir
+          mountPath: /test
+      volumes:
+      - name: nfsdir
+        persistentVolumeClaim:
+          claimName: nfs-pv-claim

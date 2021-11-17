@@ -178,3 +178,86 @@ total 0
 The volume is mounted, but the dir is empty, as expected.
 
 * Optional. Raise an nfs share on a remote machine. Create a pv using this share, create a pvc for it, create a deployment. Save data to the share, delete the deployment, delete the pv/pvc, check that the data is safe.
+
+Prepare server:
+```bash
+$ sudo apt install nfs-kernel-server
+$ sudo mkdir /data
+$ sudo echo "/data 172.31.200.108(rw,no_root_squash,subtree_check)" >> /etc/exports
+$ sudo exportfs -a
+$ sudo /etc/init.d/nfs-kernel-server reload
+```
+
+Prepare PV and PVC:
+```bash
+$ kubectl apply -f pv.yaml
+persistentvolume/nfs-pv created
+
+$ kubectl get pv
+NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE
+nfs-pv   1Gi        RWX            Retain           Available                                   7s
+
+$ kubectl apply -f pvc.yaml
+persistentvolumeclaim/nfs-pv-claim created
+
+$ kubectl get pvc
+NAME           STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+nfs-pv-claim   Bound    nfs-pv   1Gi        RWX                           4s
+
+$ kubectl get pv
+NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                  STORAGECLASS   REASON   AGE
+nfs-pv   1Gi        RWX            Retain           Bound    default/nfs-pv-claim                           24s
+```
+
+Deploy application:
+```bash
+$ kubectl apply -f nfsdir.yaml
+deployment.apps/nginx-nfsdir created
+
+$ kubectl get pod
+NAME                            READY   STATUS    RESTARTS   AGE
+nginx-nfsdir-7ddbbbb766-6w4k8   1/1     Running   0          11s
+```
+
+Connect to the pod and store some data to the volume:
+```bash
+$ kubectl exec -ti nginx-nfsdir-7ddbbbb766-6w4k8 -- bash
+
+root@nginx-nfsdir-7ddbbbb766-6w4k8:/# df | grep test
+172.31.206.161:/data 129064192 1985792 120476160   2% /test
+
+root@nginx-nfsdir-7ddbbbb766-6w4k8:/# ls -l /test/
+total 0
+
+root@nginx-nfsdir-7ddbbbb766-6w4k8:/# echo $HOSTNAME >> /test/myfile
+
+root@nginx-nfsdir-7ddbbbb766-6w4k8:/# cat /test/myfile
+nginx-nfsdir-7ddbbbb766-6w4k8
+```
+
+Delete deployment, pvc and pv:
+```bash
+$ kubectl delete deployment nginx-nfsdir
+deployment.apps "nginx-nfsdir" deleted
+$ kubectl delete pvc nfs-pv-claim
+persistentvolumeclaim "nfs-pv-claim" deleted
+$ kubectl delete pv nfs-pv
+persistentvolume "nfs-pv" deleted
+
+$ kubectl get pod
+No resources found in default namespace.
+$ kubectl get pv
+No resources found
+$ kubectl get pvc
+No resources found in default namespace.
+```
+
+Go to the NFS server and make sure that file is in place:
+```bash
+vagrant@debian11:~$ ls -l /data
+total 4
+-rw-r--r-- 1 root root 30 Nov 17 13:54 myfile
+
+vagrant@debian11:~$ cat /data/myfile
+nginx-nfsdir-7ddbbbb766-6w4k8
+```
