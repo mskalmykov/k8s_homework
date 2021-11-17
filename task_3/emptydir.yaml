@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-emptydir
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx
+        imagePullPolicy: Never
+        name: nginx
+        volumeMounts:
+        - mountPath: /test
+          name: emptydir
+      volumes:
+      - emptyDir: {}
+        name: emptydir
