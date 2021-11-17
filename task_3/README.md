@@ -100,6 +100,7 @@ Result:
 ![screenshot](task3_screen3.png)
 
 * Create deploy with emptyDir save data to mountPoint emptyDir, delete pods, check data.
+
 emptydir.yaml contents:
 ```yaml
 apiVersion: apps/v1
