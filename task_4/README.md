@@ -230,7 +230,7 @@ Issue the certificates signed with CA signature:
 ```bash
 $ for user in prod_admin prod_view ; do \
 >     openssl x509 -req -in $user.csr \
->       -CA ~/.kube/ca.crt -CAkey ~/.kube/ca.key \
+>       -CA ~/.minikube/ca.crt -CAkey ~/.minikube/ca.key \
 >       -CAcreateserial -days 500 -out $user.crt ;
 > done
 Signature ok
@@ -240,21 +240,17 @@ Signature ok
 subject=CN = prod_view
 Getting CA Private Key
 ```
-Create namespace, roles and role bindings:
+Create namespace and role bindings:
 ```bash
 $ kubectl create ns prod
 namespace/prod created
 
-$ kubectl -n prod create role r_prod_view --verb=get,list,watch --resource=*.*
-role.rbac.authorization.k8s.io/r_prod_view created
-
-$ kubectl -n prod create role r_prod_admin --verb=* --resource=*.*
-role.rbac.authorization.k8s.io/r_prod_admin created
-
-$ kubectl -n prod create rolebinding rb_prod_view --role=r_prod_view --user=prod_view
+$ kubectl -n prod create rolebinding rb_prod_view \
+    --clusterrole=view --user=prod_view
 rolebinding.rbac.authorization.k8s.io/rb_prod_view created
 
-$ kubectl -n prod create rolebinding rb_prod_admin --role=r_prod_admin --user=prod_admin
+$ kubectl -n prod create rolebinding rb_prod_admin \
+    --clusterrole=admin --user=prod_admin
 rolebinding.rbac.authorization.k8s.io/rb_prod_admin created
 ```
 Establish credentials and contexts for users:
@@ -317,7 +313,9 @@ User have read-only access to the namespace prod resources.
 $ kubectl create sa sa-namespace-admin
 serviceaccount/sa-namespace-admin created
 
-$ kubectl create rolebinding rb_ns_admin --clusterrole=admin --serviceaccount=default:sa-namespace-admin
+$ kubectl create rolebinding rb_ns_admin \
+    --clusterrole=admin \
+    --serviceaccount=default:sa-namespace-admin
 rolebinding.rbac.authorization.k8s.io/rb_ns_admin created
 
 $ kubectl get sa sa-namespace-admin -o jsonpath={.secrets[0].name}
